@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TestFlight Beta Feedback Organizer — Track & Prioritize Tester Feedback</title>
+<meta name="description" content="Organize TestFlight beta feedback by category, priority, and status. Import raw feedback, tag by tester, export to CSV or Markdown. Free, browser-only, saves locally." />
+<link rel="canonical" href="https://testflight-feedback-organizer.vercel.app/" />
+<meta property="og:title" content="TestFlight Beta Feedback Organizer" />
+<meta property="og:description" content="Track and prioritize TestFlight beta tester feedback. Categorize bugs, feature requests, and UX issues. Export to CSV. Free, browser-only." />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="TestFlight Beta Feedback Organizer" />
+<meta name="twitter:description" content="Organize TestFlight beta feedback. Track bugs, features, crashes. Export to CSV or Markdown. Free." />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"TestFlight Beta Feedback Organizer","url":"https://testflight-feedback-organizer.vercel.app/","description":"Browser-based tracker for TestFlight beta tester feedback. Categorize by type and priority, update status, export to CSV or Markdown. Data saved in browser localStorage.","applicationCategory":"DeveloperApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+</script>
+<style>
+  :root{
+    --bg:#0b0c10;--panel:#15171f;--panel2:#1c1f2a;--ink:#eef1f7;--muted:#9aa3b5;
+    --line:#262a36;--accent:#5b8cff;--ok:#34d399;--warn:#fbbf24;--err:#f87171;
+    --radius:14px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:radial-gradient(1100px 600px at 20% -5%,#0f1835 0,transparent 55%),var(--bg)}
+  header{padding:42px 22px 10px;max-width:1040px;margin:0 auto}
+  .badge{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);
+    border:1px solid var(--line);padding:5px 11px;border-radius:999px;background:var(--panel)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok)}
+  h1{font-size:30px;margin:16px 0 6px;letter-spacing:-.4px}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--muted);max-width:640px}
+  main{max-width:1040px;margin:18px auto 60px;padding:0 22px}
+
+  /* Stats bar */
+  .stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+  .stat-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 18px}
+  .stat-num{font-size:28px;font-weight:800;letter-spacing:-1px}
+  .stat-label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+  .cat-pills{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;margin-bottom:14px}
+  .stat-pill{font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px}
+
+  /* Two-column layout */
+  .layout{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+  @media(max-width:760px){.layout{grid-template-columns:1fr}}
+
+  /* Left: list */
+  .list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+  .list-title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .count-badge{font-size:12px;font-weight:700;color:var(--muted);font-family:var(--mono);
+    background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:1px 7px}
+  .list-actions{display:flex;gap:7px}
+  .list-actions button{cursor:pointer;border:1px solid var(--line);border-radius:7px;padding:5px 12px;
+    font:12px/1 inherit;font-weight:600;background:var(--panel2);color:var(--muted)}
+  .list-actions button:hover{border-color:var(--accent);color:var(--accent)}
+  .list-actions button.danger:hover{border-color:var(--err);color:var(--err)}
+
+  /* Filters row */
+  .filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+  .filters select{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer;outline:none}
+  .filters select:focus{border-color:var(--accent)}
+
+  /* Feedback items */
+  .feedback-item{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:14px;margin-bottom:8px}
+  .item-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;flex-wrap:wrap;gap:6px}
+  .item-badges{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+  .badge-pill{font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px}
+  .prio-chip{font-size:12px;font-weight:600}
+  .item-tester{font-size:12px;color:var(--muted)}
+  .item-actions{display:flex;align-items:center;gap:6px}
+  .item-date{font-size:12px;color:var(--muted)}
+  .icon-btn{background:none;border:none;font-size:15px;cursor:pointer;padding:2px 4px;opacity:.6}
+  .icon-btn:hover{opacity:1}
+  .item-text{font-size:14px;font-weight:500;line-height:1.4;margin-bottom:4px}
+  .item-note{font-size:13px;color:var(--muted);margin-bottom:8px;border-left:2px solid var(--line);
+    padding-left:10px;font-style:italic}
+  .quick-status{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+  .qs-btn{cursor:pointer;border:1px solid var(--line);border-radius:6px;padding:3px 9px;
+    font:11.5px/1 inherit;font-weight:600;background:none;color:var(--muted)}
+  .qs-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .qs-btn.active{font-weight:700}
+
+  .empty-state{color:var(--muted);font-size:14px;padding:32px;text-align:center;
+    background:var(--panel);border:1px dashed var(--line);border-radius:12px}
+
+  /* Right: add form */
+  .form-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;position:sticky;top:18px}
+  .form-card h3{font-size:15px;font-weight:700;margin:0 0 14px}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;font-weight:700;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+  .field textarea,.field input,.field select{width:100%;background:var(--panel2);border:1px solid var(--line);
+    color:var(--ink);border-radius:8px;padding:8px 12px;font:inherit;font-size:14px;outline:none}
+  .field textarea:focus,.field input:focus,.field select:focus{border-color:var(--accent)}
+  .field textarea{resize:vertical;min-height:80px}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  #statusRow{display:none;align-items:center;gap:8px;margin-bottom:12px}
+  #statusRow label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+  .form-btns{display:flex;gap:8px;margin-top:4px}
+  button.primary-sm{cursor:pointer;border:0;border-radius:8px;padding:9px 16px;font:inherit;font-weight:650;
+    background:linear-gradient(180deg,#6b97ff,#4a78ff);color:#fff;flex:1;font-size:14px}
+  button.secondary-sm{cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:9px 14px;
+    font:13px/1 inherit;font-weight:600;background:none;color:var(--muted)}
+  button.secondary-sm:hover{border-color:var(--accent);color:var(--accent)}
+  .import-link{font-size:12.5px;color:var(--accent);cursor:pointer;text-decoration:underline;
+    display:block;text-align:center;margin-top:10px}
+
+  /* Import modal */
+  #importModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;
+    align-items:center;justify-content:center;padding:22px}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:24px;width:100%;max-width:540px}
+  .modal h3{font-size:16px;font-weight:700;margin:0 0 8px}
+  .modal p{font-size:13px;color:var(--muted);margin:0 0 12px}
+  .modal pre{font-size:12px;color:var(--muted);background:var(--panel2);padding:10px;
+    border-radius:8px;margin:0 0 12px;overflow:auto}
+  .modal textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:10px 12px;font:13px/1.6 var(--mono);resize:vertical;min-height:160px;outline:none}
+  .modal textarea:focus{border-color:var(--accent)}
+  .modal-btns{display:flex;gap:8px;margin-top:12px}
+
+  .tip-box{background:linear-gradient(135deg,#1a2035 0%,#141825 100%);border:1px solid #2a304a;
+    border-radius:14px;padding:22px 26px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-top:24px}
+  footer{max-width:1040px;margin:0 auto;padding:0 22px 50px;color:#6b7385;font-size:12.5px}
+  footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <span class="badge"><span class="dot"></span>Saves in your browser · nothing uploaded</span>
+  <h1>TestFlight Feedback <span>Organizer</span></h1>
+  <p class="sub">Track, categorize, and prioritize beta tester feedback in one place. Mark items as fixed, export to CSV or Markdown — no account, no sync, just your data.</p>
+</header>
+<main>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-num" id="statTotal">0</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statOpen" style="color:var(--accent)">0</div>
+      <div class="stat-label">Open</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statFixed" style="color:var(--ok)">0</div>
+      <div class="stat-label">Fixed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statBugs" style="color:var(--err)">0</div>
+      <div class="stat-label">Bugs & Crashes</div>
+    </div>
+  </div>
+
+  <div id="catStats" class="cat-pills"></div>
+
+  <div class="layout">
+    <!-- List -->
+    <div>
+      <div class="list-header">
+        <div class="list-title">
+          Feedback
+          <span class="count-badge" id="shownCount">0 of 0</span>
+        </div>
+        <div class="list-actions">
+          <button onclick="exportCSV()">↓ CSV</button>
+          <button onclick="exportMarkdown()">↓ Markdown</button>
+          <button class="danger" onclick="clearAll()">Clear All</button>
+        </div>
+      </div>
+
+      <div class="filters">
+        <select id="filterCat">
+          <option value="">All categories</option>
+          <option>Bug</option><option>Crash</option><option>Feature Request</option>
+          <option>UX Issue</option><option>Question</option><option>Praise</option>
+        </select>
+        <select id="filterStatus">
+          <option value="">All statuses</option>
+          <option>New</option><option>In Progress</option><option>Needs Info</option>
+          <option>Fixed</option><option>Won't Fix</option>
+        </select>
+        <select id="filterPriority">
+          <option value="">All priorities</option>
+          <option>Critical</option><option>High</option><option>Medium</option><option>Low</option>
+        </select>
+        <select id="sortBy">
+          <option value="date">Sort: Newest</option>
+          <option value="priority">Sort: Priority</option>
+          <option value="status">Sort: Status</option>
+          <option value="category">Sort: Category</option>
+        </select>
+      </div>
+
+      <div id="feedbackList"></div>
+    </div>
+
+    <!-- Form -->
+    <div>
+      <div class="form-card" id="addForm-wrapper">
+        <h3 id="formTitle">Add Feedback</h3>
+        <form id="addForm">
+          <div class="field">
+            <label>Feedback</label>
+            <textarea id="feedbackText" placeholder="Describe the bug, request, or observation…" required></textarea>
+          </div>
+          <div class="field">
+            <label>Internal Note (optional)</label>
+            <textarea id="feedbackNote" rows="2" placeholder="Context, repro steps, linked issue…"></textarea>
+          </div>
+          <div class="field">
+            <label>Tester handle (optional)</label>
+            <input type="text" id="feedbackTester" placeholder="e.g. johndoe or beta@example.com" />
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Category</label>
+              <select id="feedbackCategory">
+                <option>Bug</option><option>Crash</option><option>Feature Request</option>
+                <option>UX Issue</option><option>Question</option><option>Praise</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Priority</label>
+              <select id="feedbackPriority">
+                <option>Critical</option><option>High</option><option selected>Medium</option><option>Low</option>
+              </select>
+            </div>
+          </div>
+          <div id="statusRow">
+            <label>Status</label>
+            <select id="feedbackStatus" style="flex:1">
+              <option>New</option><option>In Progress</option><option>Needs Info</option>
+              <option>Fixed</option><option>Won't Fix</option>
+            </select>
+          </div>
+          <div class="form-btns">
+            <button type="submit" class="primary-sm">Add Item</button>
+            <button type="button" class="secondary-sm" onclick="cancelEdit()">Cancel</button>
+          </div>
+        </form>
+        <span class="import-link" onclick="showImport()">↑ Import from text / paste</span>
+      </div>
+
+      <div class="tip-box" style="margin-top:14px">
+        <div>
+          <div style="font-weight:700;font-size:15px;margin-bottom:4px">✦ Support the project</div>
+          <div style="color:#9aa3b5;font-size:12.5px;max-width:260px">Keep these tools free and fund more.</div>
+        </div>
+        <a href="https://buy.stripe.com/4gM28t2xG3SngLvbiY6wE01" target="_blank" rel="noopener"
+          style="display:inline-block;background:linear-gradient(180deg,#6b97ff,#4a78ff);color:#fff;font-weight:650;font-size:13px;padding:10px 20px;border-radius:9px;text-decoration:none">
+          Support · $9.90
+        </a>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Import Modal -->
+<div id="importModal" onclick="if(event.target===this)hideImport()">
+  <div class="modal">
+    <h3>Import from Text</h3>
+    <p>Paste raw feedback — one item per line. Use optional tags: <code>[Category]</code>, <code>[Priority]</code>, <code>@tester</code></p>
+    <pre>App crashes on launch [Crash] [Critical] @alexb
+Dark mode text is unreadable [UX Issue] [High]
+Would love export to PDF [Feature Request] @sarah
+Everything works great [Praise] [Low]</pre>
+    <textarea id="importText" placeholder="Paste feedback lines here…"></textarea>
+    <div class="modal-btns">
+      <button class="primary-sm" style="max-width:160px" onclick="doImport()">Import</button>
+      <button class="secondary-sm" onclick="hideImport()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Built by <b>Orb Intelligence</b>. Data is stored only in your browser — clear your cache and it's gone. Export regularly if this data matters.
+  <br><br>
+  More free tools:
+  <a href="https://appstore-metadata-auditor.vercel.app/" rel="noopener">Metadata Auditor</a> ·
+  <a href="https://ios-privacy-policy-generator.vercel.app/" rel="noopener">Privacy Policy Generator</a> ·
+  <a href="https://ios-app-review-generator.vercel.app/" rel="noopener">Review Responder</a> ·
+  <a href="https://appstore-screenshot-generator-theta.vercel.app/" rel="noopener">Screenshot Generator</a> ·
+  <a href="https://appstore-keyword-optimizer.vercel.app/" rel="noopener">Keyword Optimizer</a> ·
+  <a href="https://appstore-release-notes-generator.vercel.app/" rel="noopener">Release Notes Generator</a> ·
+  <a href="https://ios-app-icon-resizer.vercel.app/" rel="noopener">Icon Resizer</a> ·
+  <a href="https://appstore-submission-checklist.vercel.app/" rel="noopener">Submission Checklist</a> ·
+  <a href="https://ios-privacy-manifest-generator.vercel.app/" rel="noopener">Privacy Manifest Generator</a> ·
+  <a href="https://ios-entitlements-generator.vercel.app/" rel="noopener">Entitlements Generator</a> ·
+  <a href="https://testflight-feedback-organizer.vercel.app/" rel="noopener">Beta Feedback Organizer</a>
+</footer>
+<script src="organizer.js"></script>
+</body>
+</html>
